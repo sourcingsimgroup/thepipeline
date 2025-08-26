@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>THE PIPELINE - FLK</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{ --brand:#3F704D; --bg:#fff; --ink:#212121; --muted:#f3f4f6; --line:#e5e7eb; --danger:#d72638; --gray:#9ca3af; --head-bg:#222624; --head-fg:#e1e8e5; --name-col-w:260px;}
+@media (max-width:640px){ :root{ --name-col-w:160px; } }
+*{box-sizing:border-box} html,body{width:100%;max-width:100%;overflow-x:hidden}
+body{margin:0;font-family:Montserrat,system-ui,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+.loading-screen{position:fixed;inset:0;z-index:9999;background:#0f1720;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:24px}
+.loading-logo{color:#E6EDF3;letter-spacing:.15em;text-transform:uppercase;font-weight:800;font-size:clamp(26px,5vw,42px);animation:blink 1.1s ease-in-out infinite}
+.loading-sub{color:#A7B2BD;font-size:14px;opacity:.9;text-align:center}
+.loading-bar{width:min(220px,60vw);height:4px;background:rgba(255,255,255,.16);border-radius:9999px;overflow:hidden;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.06) inset}
+.loading-bar::before{content:"";position:absolute;inset:0;width:40%;height:100%;background:linear-gradient(90deg,#fff,#cfd8e3);border-radius:inherit;animation:load 1.2s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+@keyframes load{0%{transform:translateX(-100%)}50%{transform:translateX(30%)}100%{transform:translateX(200%)}}
+@media (prefers-reduced-motion:reduce){.loading-logo{animation:none}.loading-bar::before{animation:none;width:100%}}
+.app{opacity:0;transform:translateY(8px);transition:opacity .35s ease,transform .35s ease}
+body.ready .app{opacity:1;transform:none}
+.header{background:var(--head-bg);color:var(--head-fg);padding:10px 16px;position:sticky;top:0;z-index:50;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.header-inner{display:flex;align-items:center;gap:16px;justify-content:space-between;flex-wrap:wrap}
+.title{margin:0;font-weight:700;font-size:clamp(18px,2.2vw,28px);color:var(--head-fg)}
+.subtitle{margin:2px 0 0;font-size:11px;opacity:.9;letter-spacing:.02em;color:var(--head-fg)}
+.ds-bar{width:100%;margin-top:8px;position:relative}
+.ds-scroll{display:flex;gap:8px;align-items:center;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:4px 0;scroll-snap-type:x proximity}
+.ds-fade{pointer-events:none;position:absolute;top:0;bottom:0;width:20px}
+.ds-fade.left{left:-1px;background:linear-gradient(90deg,var(--head-bg),rgba(34,38,36,0))}
+.ds-fade.right{right:-1px;background:linear-gradient(270deg,var(--head-bg),rgba(34,38,36,0))}
+.ds-btn{position:relative;border:1px solid rgba(0,0,0,.35);color:#32323D;padding:8px 14px;border-radius:9999px;font-weight:700;cursor:pointer;
+background:linear-gradient(180deg,rgba(255,255,255,.65),rgba(255,255,255,.2)),linear-gradient(180deg,#bfc3bf,#9da19d);
+box-shadow:inset 0 1px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.35);
+transition:filter .2s ease,transform .02s ease;white-space:nowrap;scroll-snap-align:start}
+.ds-btn:hover{filter:brightness(1.05)} .ds-btn:active{transform:translateY(1px)}
+.ds-btn.active{color:#1b1b1b;border-color:#b48b06;background:linear-gradient(180deg,rgba(255,255,240,.75),rgba(255,255,240,.25)),linear-gradient(180deg,#ffd56a,#d2ac2e);
+box-shadow:inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(0,0,0,.12),0 2px 4px rgba(0,0,0,.35);text-shadow:0 1px 0 rgba(255,255,255,.4)}
+.layout{display:grid;grid-template-columns:220px 1fr;gap:16px;padding:16px;align-items:start}
+.content{min-width:0}
+.sidebar{position:sticky;top:70px;align-self:start;background:var(--muted);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.06);overflow:hidden}
+.sidebar-head{background:var(--head-bg);color:var(--head-fg);padding:12px 14px;font-weight:700;letter-spacing:.01em}
+.sidebar-body{padding:12px}
+.filter-toggle{display:none;align-items:center;gap:10px;width:fit-content;margin:12px 12px 8px 12px;padding:10px 14px;background:var(--brand);color:#fff;border:none;border-radius:14px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.filter-toggle .bars{position:relative;width:18px;height:12px}
+.filter-toggle .bars::before,.filter-toggle .bars::after,.filter-toggle .bars>span{content:"";position:absolute;left:0;right:0;height:2px;background:#fff;border-radius:2px}
+.filter-toggle .bars::before{top:0}.filter-toggle .bars>span{top:5px}.filter-toggle .bars::after{bottom:0}
+.filters{display:grid;grid-template-columns:1fr;gap:10px}
+.capsule{width:100%;background:#f1f3f5;color:var(--ink);border:1px solid var(--line);border-radius:12px;min-height:48px;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:6px 34px 6px 12px;cursor:pointer}
+.capsule label{position:absolute;left:12px;right:34px;top:6px;margin:0;font-size:11px;font-weight:800;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#475569;pointer-events:none}
+.capsule .cap-value{position:absolute;left:12px;right:34px;bottom:6px;color:var(--brand);font-weight:400;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+.capsule .cap-value:empty{display:none}
+.capsule select{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:none;outline:none;opacity:0;cursor:pointer;appearance:none;z-index:1}
+.capsule[data-multi="true"] select{pointer-events:none}
+.cap-reset{position:absolute;right:6px;top:50%;transform:translateY(-50%);z-index:2;width:22px;height:22px;border-radius:9999px;background:rgba(0,0,0,.06);color:#111;border:none;cursor:pointer;display:none;line-height:22px;font-size:14px}
+.cap-reset.show{display:inline-grid;place-items:center}
+.multi-panel{position:fixed;z-index:70;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.18);width:min(320px,90vw);max-height:300px;overflow:auto;padding:8px;font-size:12px}
+.panel-search{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:8px;outline:none}
+.multi-tip{font-size:12px;color:#64748b;padding:4px 6px}
+.multi-selectall{display:flex;align-items:center;gap:8px;padding:8px 6px;border-radius:8px;background:#f8fafc;border:1px dashed #e2e8f0;margin-bottom:6px}
+.multi-item{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:8px}
+.multi-item:hover{background:#f6f7f9}
+.multi-item input{width:16px;height:16px}
+.section{margin-bottom:16px;background:#fff;border-radius:16px;box-shadow:0 4px 10px rgba(0,0,0,.06);overflow:hidden}
+.section-head{background:var(--head-bg);color:var(--head-fg);padding:12px 16px;font-weight:700}
+.block{padding:12px 16px}
+.stats{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px}
+.stat-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.stat-label{font-size:12px;font-weight:700;color:#334155;margin:0 0 6px}
+.stat-kpi{font-size:28px;font-weight:800;color:#222624;line-height:1}
+.stat-sub{font-size:11px;color:#64748b;margin-top:4px}
+.toolbar{display:flex;align-items:flex-start;gap:12px;padding:0 16px 12px;color:#555;font-size:13px;flex-wrap:wrap}
+.pager{display:flex;flex-direction:column;gap:4px}
+.pager-controls{display:flex;align-items:center;gap:12px}
+.page-mini{font-size:6px;color:var(--gray);line-height:1}
+.btn{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:8px 12px;font-weight:600;cursor:pointer}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn.danger{background:var(--danger)}
+.jobsearch{position:relative;min-width:240px;flex:1 1 320px;max-width:520px}
+.jobsearch .js-input{width:100%;border:1px solid var(--line);border-radius:9999px;padding:10px 38px 10px 36px;outline:none;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.jobsearch .icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:16px;opacity:.6}
+.jobsearch .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:transparent;font-size:18px;opacity:.5;cursor:pointer;display:none}
+.jobsearch.hasSel .clear{display:block}
+.job-panel{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:60}
+.table-wrap{position:relative;padding:0 16px 16px;max-height:65vh;background:#fff;overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-gutter:stable both-edges;cursor:grab}
+.table-wrap:active{cursor:grabbing}
+.table-empty{padding:24px;color:#64748b;font-size:13px}
+.table-empty b{color:#374151}
+.table-empty code{background:#f3f4f6;padding:2px 6px;border-radius:6px}
+
+table{width:max-content;max-width:none;border-collapse:separate;border-spacing:0;table-layout:auto}
+thead th{position:sticky;top:0;z-index:20;background:var(--head-bg);color:var(--head-fg);border-top:3px solid var(--head-bg);border-bottom:2px solid #1a1d1b;text-align:left;padding:10px 8px;font-size:13px;white-space:nowrap}
+tbody td{padding:8px;border-bottom:1px solid #eee;font-size:13px;vertical-align:middle;white-space:nowrap}
+.col-name{width:var(--name-col-w);min-width:var(--name-col-w);max-width:var(--name-col-w)}
+.cell-name{max-width:var(--name-col-w);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:640px){ .cell-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}}
+thead th.sticky-col,tbody td.sticky-col{position:sticky;left:0;background-clip:padding-box}
+thead th.sticky-col{z-index:30;background:var(--head-bg)}
+tbody td.sticky-col{z-index:25;background:#fff;box-shadow:4px 0 0 0 #fff,6px 0 8px -6px rgba(0,0,0,.18)}
+@media (max-width:900px){.layout{grid-template-columns:220px 1fr}}
+@media (max-width:640px){
+  .header{padding:10px 12px}
+  .title{font-size:18px}.subtitle{font-size:10px}
+  .layout{grid-template-columns:1fr;padding:0 0 16px}
+  .sidebar{display:none}
+  .sidebar.open{display:block;position:fixed;left:0;right:0;top:0;bottom:0;border-radius:16px 16px 0 0;z-index:60;overflow:auto;background:#f6f8fa;box-shadow:0 -3px 18px rgba(0,0,0,.25)}
+  .filters{gap:8px;padding:12px}.capsule{min-height:44px;padding:6px 30px 6px 10px}
+  .capsule label{font-size:10px}.capsule .cap-value{font-size:11px}.cap-reset{width:20px;height:20px;font-size:12px;right:5px}
+  .stats{grid-template-columns:1fr;gap:10px}
+  .stat-card{padding:10px;border-radius:10px}
+  .stat-label{font-size:10px;margin-bottom:4px}
+  .stat-kpi{font-size:18px;line-height:1;color:#222624}
+  .stat-sub{font-size:10px}
+  .filter-toggle{display:flex}
+  .toolbar{gap:10px;padding:0 12px 10px;flex-direction:column}
+  .jobsearch{width:100%;flex:1 1 100%}
+  .btn{padding:7px 10px;border-radius:8px;font-size:12px}
+  .page-mini{font-size:6px}
+  .table-wrap{padding:0 8px 8px;max-height:70vh}
+  thead th{font-size:11px;padding:8px 6px} tbody td{font-size:11px;padding:6px}
+}
+.multi-panel.mobile{left:50%!important;transform:translateX(-50%);top:auto!important;bottom:0;width:100vw;max-height:65vh;border-radius:16px 16px 0 0;padding:12px}
+.multi-panel.mobile .panel-search{position:sticky;top:0;border-radius:9999px;background:#f8fafc;box-shadow:0 1px 0 rgba(0,0,0,.04) inset;font-size:14px}
+.multi-panel.mobile .multi-selectall{margin-top:8px}
+
+/* ===== AUTH (Login) ===== */
+.auth-screen{position:fixed;inset:0;z-index:10000;display:none;place-items:center;background:linear-gradient(180deg,#111827,#0b1220)}
+.auth-card{width:clamp(280px,90vw,380px);background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);padding:18px}
+.auth-title{margin:0 0 4px;font-weight:800;font-size:20px;color:#111}
+.auth-sub{margin:0 0 16px;color:#64748b;font-size:12px}
+.auth-form label{display:block;font-size:12px;font-weight:700;color:#334155;margin:10px 0 6px}
+.auth-form input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;outline:none}
+.auth-form .auth-actions{display:flex;gap:8px;align-items:center;margin-top:14px}
+.auth-error{display:none;margin-top:10px;font-size:12px;color:#991b1b;background:#fee2e2;border:1px solid #fecaca;border-radius:10px;padding:8px}
+.auth-hint{margin-top:8px;color:#64748b;font-size:11px}
+.userbox{display:none;align-items:center;gap:8px}
+.userbox .uname{font-size:12px;background:#111827;color:#e5e7eb;padding:6px 10px;border-radius:9999px}
+</style>
+</head>
+<body>
+<!-- LOADER -->
+<div id="loader" class="loading-screen" aria-live="polite" aria-busy="true">
+  <div class="loading-logo">THE PIPELINE</div>
+  <div class="loading-bar" role="progressbar" aria-label="Memuat"></div>
+  <div id="loader-sub" class="loading-sub">Mengambil data…</div>
+</div>
+
+<!-- AUTH OVERLAY -->
+<div id="auth" class="auth-screen" aria-labelledby="authTitle" aria-modal="true" role="dialog">
+  <div class="auth-card">
+    <h2 id="authTitle" class="auth-title">Masuk ke THE PIPELINE</h2>
+    <p class="auth-sub">Gunakan kredensial yang diizinkan.</p>
+    <form id="authForm" class="auth-form" autocomplete="off">
+      <label for="authUser">Username</label>
+      <input id="authUser" name="username" required minlength="3" autofocus>
+      <label for="authPass">Password</label>
+      <input id="authPass" name="password" type="password" required minlength="3">
+      <div class="auth-actions">
+        <button class="btn" type="submit">Login</button>
+        <button id="authClearBtn" class="btn danger" type="button" title="Hapus sesi">Clear Session</button>
+      </div>
+      <div id="authError" class="auth-error">Username / password salah.</div>
+      <div class="auth-hint">User awal: <code>sourcingho</code> / <code>sourcingho</code></div>
+    </form>
+  </div>
+</div>
+
+<header class="header">
+  <div class="header-inner">
+    <div>
+      <h1 class="title">THE PIPELINE - FLK</h1>
+      <p class="subtitle">create &amp; develop by sourcing department</p>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="btnCheck" class="btn" title="Cek status sumber">Cek Sumber</button>
+      <!-- USER BOX + LOGOUT (muncul setelah login) -->
+      <div id="userBox" class="userbox">
+        <span class="uname">👋 <b id="usernameLabel"></b></span>
+        <button id="btnLogout" class="btn danger" title="Keluar">Logout</button>
+      </div>
+    </div>
+  </div>
+  <div class="ds-bar" aria-label="Sumber data">
+    <div class="ds-fade left"></div>
+    <div class="ds-scroll ds-switch" role="tablist">
+      <button class="ds-btn" data-ds="nasional" aria-selected="true">Nasional</button>
+      <button class="ds-btn" data-ds="lokerin">Lokerin</button>
+      <button class="ds-btn" data-ds="onsite">Onsite</button>
+      <button class="ds-btn" data-ds="adira">Adira</button>
+    </div>
+    <div class="ds-fade right"></div>
+  </div>
+</header>
+
+<div id="dsCheck" style="display:none;padding:8px 16px;font:12px/1.4 Montserrat,Arial;background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;margin:12px 16px"></div>
+
+<main class="app">
+  <div class="layout">
+    <aside id="filterSidebar" class="sidebar" aria-label="Filter">
+      <div class="sidebar-head">Filter</div>
+      <div class="sidebar-body">
+        <section id="filters" class="filters">
+          <div class="capsule">
+            <button class="cap-reset" data-for="f-year" aria-label="Hapus Tahun">✕</button>
+            <label for="f-year">Tahun</label><span class="cap-value" id="val-year"></span>
+            <select id="f-year"><option value="">Semua Tahun</option></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="month">
+            <button class="cap-reset" data-for="multi-month" aria-label="Reset Bulan">✕</button>
+            <label>Bulan</label><span class="cap-value" id="val-month"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="day">
+            <button class="cap-reset" data-for="multi-day" aria-label="Reset Tanggal">✕</button>
+            <label>Tanggal</label><span class="cap-value" id="val-day"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="minat">
+            <button class="cap-reset" data-for="multi-minat" aria-label="Reset Minat">✕</button>
+            <label>Minat Posisi</label><span class="cap-value" id="val-minat"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="peng">
+            <button class="cap-reset" data-for="multi-peng" aria-label="Reset Pengalaman">✕</button>
+            <label>Pengalaman Terakhir</label><span class="cap-value" id="val-peng"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="pend">
+            <button class="cap-reset" data-for="multi-pend" aria-label="Reset Pendidikan">✕</button>
+            <label>Pendidikan Terakhir</label><span class="cap-value" id="val-pend"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="prov">
+            <button class="cap-reset" data-for="multi-prov" aria-label="Reset Provinsi">✕</button>
+            <label>Provinsi Minat</label><span class="cap-value" id="val-prov"></span><select aria-hidden="true"></select>
+          </div>
+          <div class="capsule" data-multi="true" data-key="kota">
+            <button class="cap-reset" data-for="multi-kota" aria-label="Reset Kota">✕</button>
+            <label>Kota Minat</label><span class="cap-value" id="val-kota"></span><select aria-hidden="true"></select>
+          </div>
+        </section>
+      </div>
+    </aside>
+
+    <div class="content">
+      <section class="section">
+        <div class="section-head">Ringkasan Pelamar</div>
+        <div class="block">
+          <div class="stats">
+            <div class="stat-card"><div class="stat-label">Total Pelamar</div><div id="stat-total" class="stat-kpi">0</div><div class="stat-sub">baris hasil filter</div></div>
+            <div class="stat-card"><div class="stat-label">Fresh Graduate</div><div id="stat-fresh" class="stat-kpi">0</div><div class="stat-sub">durasi 0 / fresh</div></div>
+            <div class="stat-card"><div class="stat-label">Experienced</div><div id="stat-exp" class="stat-kpi">0</div><div class="stat-sub">durasi &gt; 0</div></div>
+          </div>
+        </div>
+      </section>
+
+      <button id="filterToggle" class="filter-toggle" aria-controls="filterSidebar" aria-expanded="false" type="button">
+        <span class="bars"><span></span></span>
+        <span class="label">Filter</span>
+      </button>
+
+      <div class="toolbar">
+        <div class="jobsearch" id="jobSearch">
+          <span class="icon">🔎</span>
+          <input id="jobInput" class="js-input" type="search" placeholder="Search by jobs…" autocomplete="off">
+          <button id="jobClear" class="clear" title="Clear">✕</button>
+          <div id="jobPanel" class="job-panel"></div>
+        </div>
+
+        <div class="pager">
+          <div class="pager-controls">
+            <button id="prev" class="btn">Prev</button>
+            <button id="next" class="btn">Next</button>
+          </div>
+          <span id="pageMini" class="page-mini">1 of 1 halaman</span>
+        </div>
+        <button id="download" class="btn danger" title="Download Excel">⬇︎ Excel</button>
+      </div>
+
+      <section class="section">
+        <div class="section-head">Tabel Data Pelamar</div>
+        <div class="table-wrap" id="tableWrap">
+          <div id="empty" class="table-empty" style="display:none">Tidak ada data untuk ditampilkan. <b>Cek:</b> status berbagi spreadsheet (set <code>Anyone with the link - Viewer</code>), nama sheet <code>Responses</code>, dan tombol <b>Cek Sumber</b> di atas.</div>
+          <table id="grid" style="display:none">
+            <thead><tr id="thead-row"></tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+/* ========= AUTH ========= */
+const USERS = [
+  { u: 'sourcingho', p: 'sourcingho', name: 'Sourcing HO' },
+  // Tambahkan user lain di sini: { u:'username', p:'password', name:'Nama tampilan' },
+];
+
+let DATA_LOADED = false;
+
+function showAuth(){
+  document.getElementById('auth').style.display='grid';
+  // jangan tampilkan loader saat menunggu login
+  const ld=document.getElementById('loader'); if(ld){ ld.style.display='none'; }
+}
+function onLogin(skipBoot=false){
+  const sess = JSON.parse(localStorage.getItem('pipeline_user')||'{}');
+  // tampilkan identitas + tombol logout
+  const box=document.getElementById('userBox');
+  const name = USERS.find(x=>x.u===sess.u)?.name || sess.u || 'User';
+  document.getElementById('usernameLabel').textContent = name;
+  box.style.display='flex';
+  // load data kalau belum
+  if(!skipBoot || !DATA_LOADED){
+    showLoader();
+    boot(CURRENT_DS);
+  }
+  // tutup overlay login
+  document.getElementById('auth').style.display='none';
+}
+function isValid(u,p){ return USERS.some(x=>x.u===u && x.p===p); }
+
+document.getElementById('authForm').addEventListener('submit',(e)=>{
+  e.preventDefault();
+  const u=document.getElementById('authUser').value.trim();
+  const p=document.getElementById('authPass').value;
+  const err=document.getElementById('authError');
+  if(isValid(u,p)){
+    localStorage.setItem('pipeline_user', JSON.stringify({u, t: Date.now()}));
+    err.style.display='none';
+    onLogin(false);
+  }else{
+    err.style.display='block';
+  }
+});
+document.getElementById('authClearBtn').addEventListener('click',()=>{
+  localStorage.removeItem('pipeline_user');
+  document.getElementById('authUser').value='';
+  document.getElementById('authPass').value='';
+  document.getElementById('authError').style.display='none';
+});
+
+document.getElementById('btnLogout').addEventListener('click',()=>{
+  localStorage.removeItem('pipeline_user');
+  location.reload();
+});
+
+/* ========= Data Source =========
+   Menggunakan endpoint GVIZ CSV (tqx=out:csv) + nama sheet "Responses".
+   Pastikan tiap spreadsheet diset "Anyone with the link: Viewer".
+*/
+const DS = {
+  nasional:{label:"Nasional", id:"1cRKdIFwWuHauauIZsJ7_nrzSjygh7PCNhLFXuIm5b3g", sheets:["Responses","Form Responses 1","Sheet1"]},
+  lokerin: {label:"Lokerin",  id:"1wz7lhujZmstivyfGQdtY3J5DdFI0ZLmAy1BFKnbkxlc", sheets:["Responses","Form Responses 1","Sheet1"]},
+  onsite:  {label:"Onsite",   id:"1WR-rRDjWLzSB-Mdiie25L_TRzoer6cM2Q42Hwfa2Whw", sheets:["Responses","Form Responses 1","Sheet1"]},
+  adira:   {label:"Adira",    id:"15SNy2D_bfkenZPvCHo9DG9dSgqLhwHQ4B3fzrmzTaiE", sheets:["Responses","Form Responses 1","Sheet1"]},
+};
+
+/* ====== PROXY & FETCH yang lebih tahan banting ====== */
+const WRAPS = [
+  u => u,
+  u => 'https://r.jina.ai/http://' + u.replace(/^https?:\/\//,'') ,
+  u => 'https://r.jina.ai/http/'  + u.replace(/^https?:\/\//,'') ,
+  u => 'https://cors.isomorphic-git.org/' + u
+];
+const FETCH_TIMEOUT_MS = 7500;
+function looksLikeHtml(text){ return /<\s*html|<!doctype/i.test(text); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+async function fetchWithTimeout(url, opt={}, ms=FETCH_TIMEOUT_MS){
+  const ctrl = new AbortController();
+  const id = setTimeout(()=>ctrl.abort(), ms);
+  try{ const res = await fetch(url, { ...opt, signal: ctrl.signal, cache:'no-store', redirect:'follow' }); return res; }
+  finally{ clearTimeout(id); }
+}
+async function tryFetchCsv(url){
+  let lastErr = null;
+  for(const wrap of WRAPS){
+    const full = wrap(url) + (wrap===WRAPS[3] ? '' : (url.includes('?')?'&':'?') + '_=' + Date.now());
+    try{
+      const r = await fetchWithTimeout(full);
+      if(!r.ok) { lastErr = new Error('HTTP ' + r.status); continue; }
+      const text = await r.text();
+      if(!text || looksLikeHtml(text)) { lastErr = new Error('Bukan CSV (mungkin belum dibuka akses publik)'); continue; }
+      return text.replace(/^\uFEFF/, '');
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error('Gagal ambil CSV');
+}
+const gvizCsv = (id, sheet) => `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheet)}`;
+
+/* Kolom yang ditampilkan di tabel */
+const TABLE_DISPLAY_COLUMNS=[
+  "NAMA LENGKAP","TANGGAL LAHIR","NOMOR WA AKTIF","NOMOR HP AKTIF","JENIS KELAMIN",
+  "PENGALAMAN KERJA TERAKHIR","DURASI PENGALAMAN KERJA","MINAT POSISI KERJA PERTAMA",
+  "PENDIDIKAN TERAKHIR","KEPEMILIKAN KENDARAAN","ALAMAT DOMISILI","KECAMATAN","KELURAHAN",
+  "PROVINSI MINAT PENEMPATAN","KOTA MINAT PENEMPATAN","UPLOAD CV"
+];
+/* Kolom untuk export */
+const EXPORT_COLUMNS=[
+  "TIMESTAMP","EMAIL AKTIF","SUMBER INFORMASI LOWONGAN","NAMA LENGKAP","TANGGAL LAHIR",
+  "NOMOR WA AKTIF","NOMOR HP AKTIF","JENIS KELAMIN","PENGALAMAN KERJA TERAKHIR","DURASI PENGALAMAN KERJA",
+  "MINAT POSISI KERJA PERTAMA","MINAT POSISI KERJA KEDUA","MINAT POSISI KERJA KETIGA","PENDIDIKAN TERAKHIR",
+  "NAMA SEKOLAH / NAMA UNIVERITAS","JURUSAN","KEPEMILIKAN KENDARAAN","KEPEMILIKAN SIM AKTIF",
+  "ALAMAT DOMISILI","KECAMATAN","KELURAHAN","PROVINSI MINAT PENEMPATAN","KOTA MINAT PENEMPATAN",
+  "UPLOAD CV","NAMA REFERENSI","TEMPAT INFORMASI","Periode","CYCLE HIRED","USIA"
+];
+const FILTER_MAP={
+  ts:"TIMESTAMP",minat:"MINAT POSISI KERJA PERTAMA",minat2:"MINAT POSISI KERJA KEDUA",minat3:"MINAT POSISI KERJA KETIGA",
+  peng:"PENGALAMAN KERJA TERAKHIR",pend:"PENDIDIKAN TERAKHIR",prov:"PROVINSI MINAT PENEMPATAN",kota:"KOTA MINAT PENEMPATAN",
+  durasi:"DURASI PENGALAMAN KERJA"
+};
+/* Aliases & synonyms */
+const ALIASES={"NAMA LENGKAP":"NAMA LENGKAP (SESUAI KTP)","TIMESTAMP":"Timestamp","UPLOAD CV":"UPLOAD CV / PORTOFOLIO"};
+const SYNONYMS={
+ "NAMA LENGKAP":["NAMA LENGKAP (SESUAI KTP)","NAMA LENGKAP"],
+ "TANGGAL LAHIR":["TANGGAL LAHIR","TGL LAHIR","DATE OF BIRTH","DOB"],
+ "NOMOR WA AKTIF":["NOMOR WA AKTIF","NO WA AKTIF","NOMOR WHATSAPP AKTIF","WA AKTIF"],
+ "NOMOR HP AKTIF":["NOMOR HP AKTIF","NO HP AKTIF","NOMOR HANDPHONE AKTIF","MOBILE"],
+ "JENIS KELAMIN":["JENIS KELAMIN","GENDER"],
+ "PENGALAMAN KERJA TERAKHIR":["PENGALAMAN KERJA TERAKHIR","PENGALAMAN TERAKHIR","PENGALAMAN KERJA"],
+ "DURASI PENGALAMAN KERJA":["DURASI PENGALAMAN KERJA","DURASI PENGALAMAN","LAMA PENGALAMAN KERJA","DURASI PENGALAMAN (TAHUN)"],
+ "MINAT POSISI KERJA PERTAMA":["MINAT POSISI KERJA PERTAMA","MINAT POSISI PERTAMA","MINAT POSISI 1","POSISI MINAT 1"],
+ "PENDIDIKAN TERAKHIR":["PENDIDIKAN TERAKHIR","PEND TERAKHIR"],
+ "KEPEMILIKAN KENDARAAN":["KEPEMILIKAN KENDARAAN","KENDARAAN"],
+ "ALAMAT DOMISILI":["ALAMAT DOMISILI","ALAMAT"],
+ "KECAMATAN":["KECAMATAN"],
+ "KELURAHAN":["KELURAHAN","DESA"],
+ "PROVINSI MINAT PENEMPATAN":["PROVINSI MINAT PENEMPATAN","PROVINSI PENEMPATAN","PROVINSI"],
+ "KOTA MINAT PENEMPATAN":["KOTA MINAT PENEMPATAN","KOTA PENEMPATAN","KAB/KOTA MINAT PENEMPATAN","KOTA/KAB MINAT PENEMPATAN","KOTA/KAB"],
+ "UPLOAD CV":["UPLOAD CV","UPLOAD CV / PORTOFOLIO","LINK CV","URL CV"]
+};
+
+/* ===== State ===== */
+const PAGE_SIZE=100;
+const MONTH_NAMES=["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+let CURRENT_DS='nasional';
+let HEADERS=[], NAME_MAP={}, ROWS=[], page=0, COL_MAP={};
+let OPTIONS={month:[],day:[],minat:[],peng:[],pend:[],prov:[],kota:[]};
+let MULTI={month:new Set(),day:new Set(),minat:new Set(),peng:new Set(),pend:new Set(),prov:new Set(),kota:new Set(),searchJobs:new Set()};
+let JOB_OPTS=[];
+
+const $=s=>document.querySelector(s);
+/* normalize kuat */
+const norm=s=>String(s||"").replace(/[\u200B-\u200D\uFEFF]/g,"").toUpperCase().replace(/\s+/g," ").trim();
+const mapHeader=name=> NAME_MAP[norm(name)] || NAME_MAP[norm(ALIASES[name]||"")] || name;
+const get=(row,label)=>{ const actual = COL_MAP[label] || mapHeader(label); return row[ actual ] ?? ""; };
+
+/* Utils */
+function hideLoader(){const el=$("#loader");if(!el) return;el.style.opacity="0";el.style.transition="opacity .25s ease";setTimeout(()=>{el.style.display="none";document.body.classList.add("ready");},250)}
+function showLoader(){const el=$("#loader"); if(!el) return; document.body.classList.remove('ready'); el.style.display='flex'; el.style.opacity='1';}
+function showLoaderError(msg){$("#loader-sub").textContent=msg||"Gagal memuat data."}
+function uniqueNumbers(arr){return [...new Set(arr)].sort((a,b)=>a-b)}
+function listPreview(arr){if(arr.length<=2) return arr.join(", ");return arr.slice(0,2).join(", ") + ` +${arr.length-2}`}
+function parseDateParts(s){ if(!s) return null; const d=new Date(s); if(!isNaN(d)) return {y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()}; const m=String(s).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/); if(m){let a=+m[1],b=+m[2],y=+m[3]; if(y<100) y+=2000; return (a>12)?{y,m:b,d:a}:{y,m:a,d:b};} return null; }
+function computeAge(dob){const p=parseDateParts(dob); if(!p) return ""; const t=new Date(); let age=t.getFullYear()-p.y; const mm=t.getMonth()+1-p.m; const dd=t.getDate()-p.d; if(mm<0||(mm===0&&dd<0)) age--; return (age>=0&&age<130)?String(age):""}
+
+/* ===== Column resolver ===== */
+function buildColMap(){
+  COL_MAP = {};
+  const headerNorms = new Set(HEADERS.map(h=>norm(h)));
+  TABLE_DISPLAY_COLUMNS.forEach(label=>{
+    let target = null;
+    const cand = (SYNONYMS[label]||[label,ALIASES[label]]).filter(Boolean);
+    for(const c of cand){
+      const n = norm(c);
+      if(headerNorms.has(n)){ target = HEADERS.find(h=>norm(h)===n); break; }
+    }
+    if(!target){
+      const tokens = norm(label).split(" ").filter(Boolean);
+      const candidates = HEADERS.map(h=>({h, n:norm(h)}));
+      for(const {h,n} of candidates){
+        const hit = tokens.filter(t=>n.includes(t)).length;
+        if(hit >= Math.max(2, Math.ceil(tokens.length*0.6))) { target = h; break; }
+      }
+    }
+    if(!target){
+      const nlabel = norm(label).replace(/[^\w ]/g,"");
+      target = HEADERS.find(h => norm(h).replace(/[^\w ]/g,"")===nlabel);
+    }
+    if(target){ COL_MAP[label] = target; }
+  });
+  const unresolved = TABLE_DISPLAY_COLUMNS.filter(lbl=>!COL_MAP[lbl]);
+  const box=document.getElementById('dsCheck');
+  if(unresolved.length && box){
+    box.style.display='block';
+    box.innerHTML += `<div style="margin-top:8px;padding:6px;border-radius:8px;background:#fff;border:1px dashed #f59e0b">
+      <b>Peringatan kolom belum cocok:</b> ${unresolved.join(", ")}
+    </div>`;
+  }
+}
+
+/* ===== UI ===== */
+function buildColumns(){const row=$("#thead-row"); row.innerHTML=""; TABLE_DISPLAY_COLUMNS.forEach((label,idx)=>{const th=document.createElement("th"); th.textContent=label; if(idx===0) th.classList.add('sticky-col','col-name'); row.appendChild(th);});}
+function fillSelect(sel,values,placeholder,disable=false){sel.innerHTML="";const o0=document.createElement("option");o0.value="";o0.textContent=placeholder;sel.appendChild(o0);values.forEach(v=>{const o=document.createElement("option");o.value=v.value;o.textContent=v.label??v.value;sel.appendChild(o);});sel.disabled=disable;}
+function buildYearOptions(){const years=uniqueNumbers( ROWS.map(r=>parseDateParts(get(r,FILTER_MAP.ts))?.y).filter(Boolean) ); fillSelect($("#f-year"), years.map(y=>({value:String(y),label:String(y)})),"Semua Tahun", years.length===0);}
+const selectedYear=()=> parseInt($("#f-year").value||"0",10) || null;
+function rebuildMonthDayOptions(){
+  const y=selectedYear();
+  const rowsY=ROWS.filter(r=>{const P=parseDateParts(get(r,FILTER_MAP.ts)); return P&&(!y||P.y===y);});
+  OPTIONS.month=uniqueNumbers(rowsY.map(r=>parseDateParts(get(r,FILTER_MAP.ts)).m)).filter(Boolean);
+  MULTI.month=new Set([...MULTI.month].filter(v=>OPTIONS.month.includes(v)));
+  const rowsYM=rowsY.filter(r=>{const P=parseDateParts(get(r,FILTER_MAP.ts)); return MULTI.month.size?MULTI.month.has(P.m):true;});
+  OPTIONS.day=uniqueNumbers(rowsYM.map(r=>parseDateParts(get(r,FILTER_MAP.ts)).d)).filter(Boolean);
+  MULTI.day=new Set([...MULTI.day].filter(v=>OPTIONS.day.includes(v)));
+}
+function subsetByDate(){
+  const y=selectedYear(),hasM=MULTI.month.size>0,hasD=MULTI.day.size>0;
+  const useDate = !!(y || hasM || hasD);
+  return ROWS.filter(r=>{
+    const P=parseDateParts(get(r,FILTER_MAP.ts));
+    if(!useDate) return true;
+    if(!P) return false;
+    if(y && P.y!==y) return false;
+    if(hasM && !MULTI.month.has(P.m)) return false;
+    if(hasD && !MULTI.day.has(P.d)) return false;
+    return true;
+  });
+}
+function rebuildOtherFiltersFromDate(){
+  let base=subsetByDate();
+  if(MULTI.minat.size){base=base.filter(r=> MULTI.minat.has(String(get(r,FILTER_MAP.minat)||"").trim()));}
+  const sets={minat:new Set(),peng:new Set(),pend:new Set(),prov:new Set(),kota:new Set()};
+  subsetByDate().forEach(r=> sets.minat.add(String(get(r,FILTER_MAP.minat)||"").trim()) );
+  base.forEach(r=>{sets.peng.add(String(get(r,FILTER_MAP.peng)||"").trim());sets.pend.add(String(get(r,FILTER_MAP.pend)||"").trim());sets.prov.add(String(get(r,FILTER_MAP.prov)||"").trim());sets.kota.add(String(get(r,FILTER_MAP.kota)||"").trim());});
+  OPTIONS.minat=[...sets.minat].filter(Boolean).sort();
+  OPTIONS.peng=[...sets.peng].filter(Boolean).sort();
+  OPTIONS.pend=[...sets.pend].filter(Boolean).sort();
+  OPTIONS.prov=[...sets.prov].filter(Boolean).sort();
+  OPTIONS.kota=[...sets.kota].filter(Boolean).sort();
+  for(const k of ['peng','pend','prov','kota']) MULTI[k]=new Set([...MULTI[k]].filter(v=>OPTIONS[k].includes(v)));
+  rebuildJobOptions();
+}
+function rebuildJobOptions(){
+  const rows=subsetByDate(); const set=new Set();
+  rows.forEach(r=>{"MINAT POSISI KERJA PERTAMA,MINAT POSISI KERJA KEDUA,MINAT POSISI KERJA KETIGA".split(',').forEach(col=>{const v=String(get(r,col)||"").trim(); if(v) set.add(v);});});
+  JOB_OPTS=[...set].sort((a,b)=>String(a).localeCompare(String(b)));
+}
+function filteredRows(){
+  let base=subsetByDate(); const has=k=>MULTI[k]&&MULTI[k].size>0;
+  if(has('minat')) base=base.filter(r=> MULTI.minat.has(String(get(r,FILTER_MAP.minat)||"").trim()));
+  if(has('peng')) base=base.filter(r=> MULTI.peng.has(String(get(r,FILTER_MAP.peng)||"").trim()));
+  if(has('pend')) base=base.filter(r=> MULTI.pend.has(String(get(r,FILTER_MAP.pend)||"").trim()));
+  if(has('prov')) base=base.filter(r=> MULTI.prov.has(String(get(r,FILTER_MAP.prov)||"").trim()));
+  if(has('kota')) base=base.filter(r=> MULTI.kota.has(String(get(r,FILTER_MAP.kota)||"").trim()));
+  if(has('searchJobs')){
+    const wanted=new Set([...MULTI.searchJobs].map(String));
+    base=base.filter(r=> wanted.has(String(get(r,FILTER_MAP.minat)||"").trim()) || wanted.has(String(get(r,FILTER_MAP.minat2)||"").trim()) || wanted.has(String(get(r,FILTER_MAP.minat3)||"").trim()));
+  }
+  return base;
+}
+function updateCapsuleValues(){
+  const sel=$("#f-year"), spanY=$("#val-year");
+  if(sel&&spanY){const has=sel.selectedIndex>0; spanY.textContent=has? sel.options[sel.selectedIndex].text:''; const btn=sel.closest('.capsule')?.querySelector('.cap-reset'); if(btn) btn.classList.toggle('show',has);}  
+  const labelOf=(key,v)=> key==='month'? MONTH_NAMES[(+v)-1]||v : v;
+  for(const key of Object.keys(MULTI)){
+    if(key==='searchJobs') continue;
+    const span=document.getElementById(`val-${key}`); if(!span) continue;
+    const arr=[...MULTI[key]]; span.textContent=arr.length? listPreview(arr.map(v=>labelOf(key,v))) : '';
+    const btn=span.closest('.capsule')?.querySelector('.cap-reset'); if(btn) btn.classList.toggle('show', !!arr.length);
+  }
+  updateJobSearchLabel();
+}
+function updateJobSearchLabel(){
+  const box=$("#jobSearch"); const input=$("#jobInput");
+  const sel=[...MULTI.searchJobs];
+  if(sel.length){ input.placeholder=listPreview(sel); box.classList.add('hasSel'); }
+  else{ input.placeholder="Search by jobs…"; box.classList.remove('hasSel'); }
+}
+
+/* ===== Jobs & Multi panel ===== */
+let openPanel=null; let panelShown=[];
+const isMobile=()=>window.matchMedia('(max-width: 640px)').matches;
+function minChars(key){return (key==='month'||key==='day')?1:3;}
+function closePanel(){if(openPanel){openPanel.remove();openPanel=null;}}
+function openMultiPanel(key,anchorEl){
+  closePanel();
+  const panel=document.createElement('div'); panel.className='multi-panel'; if(isMobile()) panel.classList.add('mobile');
+  if(!isMobile()){const rect=anchorEl.getBoundingClientRect(); panel.style.left=Math.min(Math.max(8,rect.left),window.innerWidth-380)+'px'; panel.style.top=(rect.bottom+6)+'px';}
+  const search=document.createElement('input'); search.type='search'; search.className='panel-search'; search.placeholder=`Ketik minimal ${minChars(key)} huruf…`;
+  const tip=document.createElement('div'); tip.className='multi-tip'; tip.textContent=`Ketik minimal ${minChars(key)} huruf untuk menampilkan opsi & “Pilih semua”.`;
+  const list=document.createElement('div'); panel.appendChild(search); panel.appendChild(tip); panel.appendChild(list);
+  const allOpts=(OPTIONS[key]||[]).slice(); const labelOf=v=> key==='month'? MONTH_NAMES[(+v)-1] : String(v);
+  function render(q=''){
+    list.innerHTML=''; const needle=(q||'').trim().toLowerCase(); let shown=[];
+    if(needle.length>=minChars(key)){
+      shown=allOpts.filter(v=> labelOf(v).toLowerCase().includes(needle) ); tip.style.display='none';
+      if(shown.length){
+        const allRow=document.createElement('label'); allRow.className='multi-selectall';
+        const cb=document.createElement('input'); cb.type='checkbox';
+        const allChecked=shown.every(v=>MULTI[key].has(v)), some=shown.some(v=>MULTI[key].has(v));
+        cb.checked=allChecked; if(!allChecked && some) cb.indeterminate=true;
+        const span=document.createElement('span'); span.textContent=`Pilih semua (${shown.length}) yang cocok`;
+        allRow.appendChild(cb); allRow.appendChild(span);
+        cb.addEventListener('change',()=>{ if(cb.checked){shown.forEach(v=>MULTI[key].add(v));} else{shown.forEach(v=>MULTI[key].delete(v));}
+          if(key==='month') rebuildMonthDayOptions(); if(['minat','month','day'].includes(key)) rebuildOtherFiltersFromDate(); recalc(false); updateCapsuleValues(); closePanel(); });
+        list.appendChild(allRow);
+      }
+    }else{ tip.style.display='block'; }
+    panelShown=shown.slice();
+    shown.sort((a,b)=> (key==='month'||key==='day')?((+a)-(+b)):String(a).localeCompare(String(b))).forEach(v=>{
+      const wrap=document.createElement('label'); wrap.className='multi-item';
+      wrap.innerHTML=`<input type="checkbox"> <span style="font-size:12px">${labelOf(v)}</span>`;
+      const cb=wrap.querySelector('input'); cb.checked=MULTI[key].has(v);
+      cb.addEventListener('change',()=>{ if(cb.checked) MULTI[key].add(v); else MULTI[key].delete(v);
+        if(key==='month') rebuildMonthDayOptions(); if(['minat','month','day'].includes(key)) rebuildOtherFiltersFromDate(); recalc(false); updateCapsuleValues(); closePanel(); });
+      list.appendChild(wrap);
+    });
+  }
+  render();
+  search.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ const q=search.value.trim(); if(q.length>=minChars(key) && panelShown.length){panelShown.forEach(v=>MULTI[key].add(v)); if(key==='month') rebuildMonthDayOptions(); if(['minat','month','day'].includes(key)) rebuildOtherFiltersFromDate(); recalc(); } closePanel(); e.preventDefault(); }});
+  search.addEventListener('input',()=>render(search.value));
+  document.body.appendChild(panel); openPanel=panel;
+  setTimeout(()=>{search.focus(); document.addEventListener('mousedown', onDoc, {once:true, capture:true}); },0);
+  function onDoc(e){ if(panel.contains(e.target)||anchorEl.contains(e.target)){ document.addEventListener('mousedown', onDoc, {once:true,capture:true}); return;} closePanel(); }
+}
+function openJobSuggest(){
+  const cont=$("#jobPanel"); cont.innerHTML="";
+  const panel=document.createElement('div'); panel.className='multi-panel'; if(isMobile()) panel.classList.add('mobile');
+  const input=$("#jobInput"); const s=input.value.trim().toLowerCase();
+  const search=document.createElement('input'); search.type='search'; search.className='panel-search'; search.placeholder='Ketik minimal 3 huruf…'; search.value=input.value;
+  const tip=document.createElement('div'); tip.className='multi-tip'; tip.textContent='Ketik minimal 3 huruf untuk menampilkan opsi & “Pilih semua”.';
+  const list=document.createElement('div'); panel.appendChild(search); panel.appendChild(tip); panel.appendChild(list); cont.appendChild(panel);
+  let currentShown=[];
+  function render(q=''){
+    list.innerHTML=''; const needle=(q||'').trim().toLowerCase();
+    if(needle.length>=3){
+      tip.style.display='none';
+      const shown=JOB_OPTS.filter(v=> String(v).toLowerCase().includes(needle) ); currentShown=shown.slice();
+      if(shown.length){
+        const row=document.createElement('label'); row.className='multi-selectall';
+        const cb=document.createElement('input'); cb.type='checkbox';
+        const all=shown.every(v=>MULTI.searchJobs.has(v)), some=shown.some(v=>MULTI.searchJobs.has(v));
+        cb.checked=all; if(!all && some) cb.indeterminate=true;
+        const span=document.createElement('span'); span.textContent=`Pilih semua (${shown.length}) yang cocok`;
+        row.appendChild(cb); row.appendChild(span);
+        cb.addEventListener('change',()=>{ if(cb.checked){shown.forEach(v=>MULTI.searchJobs.add(v));} else{shown.forEach(v=>MULTI.searchJobs.delete(v));} recalc(); updateJobSearchLabel(); cont.innerHTML=""; });
+        list.appendChild(row);
+      }
+      shown.forEach(v=>{
+        const wrap=document.createElement('label'); wrap.className='multi-item';
+        wrap.innerHTML=`<input type="checkbox"> <span style="font-size:12px">${v}</span>`;
+        const c=wrap.querySelector('input'); c.checked=MULTI.searchJobs.has(v);
+        c.addEventListener('change',()=>{ if(c.checked) MULTI.searchJobs.add(v); else MULTI.searchJobs.delete(v); recalc(false); updateJobSearchLabel(); cont.innerHTML=""; });
+        list.appendChild(wrap);
+      });
+      if(!shown.length){ const empty=document.createElement('div'); empty.className='multi-tip'; empty.textContent='Tidak ada hasil.'; list.appendChild(empty); }
+    }else{ tip.style.display='block'; currentShown=[]; }
+  }
+  render(s);
+  search.addEventListener('input',()=>render(search.value));
+  search.addEventListener('keydown',(e)=>{ if(e.key==='Enter'){ const q=search.value.trim(); if(q.length>=3 && currentShown.length){ currentShown.forEach(v=>MULTI.searchJobs.add(v)); recalc(); updateJobSearchLabel(); } cont.innerHTML=""; e.preventDefault(); }});
+  setTimeout(()=>{search.focus(); document.addEventListener('mousedown',onDoc,{once:true,capture:true});},0);
+  function onDoc(e){ if(panel.contains(e.target) || $("#jobSearch").contains(e.target)){ document.addEventListener('mousedown',onDoc,{once:true,capture:true}); return;} cont.innerHTML=""; }
+}
+$("#jobInput").addEventListener('focus',openJobSuggest);
+$("#jobInput").addEventListener('input',()=>{ const v=$("#jobInput").value.trim(); if(v.length>=3) openJobSuggest(); else $("#jobPanel").innerHTML=""; });
+$("#jobClear").addEventListener('click',()=>{ MULTI.searchJobs.clear(); $("#jobInput").value=''; updateJobSearchLabel(); recalc(); });
+
+/* ===== Stats / render ===== */
+function isFreshGraduate(r){const dur=String(get(r,FILTER_MAP.durasi)).toLowerCase(), peng=String(get(r,FILTER_MAP.peng)).toLowerCase(), t=dur+" "+peng; if(/fresh\s*graduate|freshgrad|fresh\b/.test(t)) return true; if(/belum.*pengalaman|tanpa.*pengalaman|no.*experience/.test(t)) return true; const m=dur.match(/(\d+(?:[.,]\d+)?)/); if(m){const v=parseFloat(m[1].replace(',','.')); if(v===0) return true; if(v>0) return false;} if(!dur.trim() && (!peng.trim() || /-+|tidak|belum/.test(peng))) return true; return false;}
+function renderStats(rows){const total=rows.length; let fresh=0; rows.forEach(r=>{if(isFreshGraduate(r)) fresh++;}); const exp=total-fresh; $("#stat-total").textContent=total.toLocaleString('id-ID'); $("#stat-fresh").textContent=fresh.toLocaleString('id-ID'); $("#stat-exp").textContent=exp.toLocaleString('id-ID');}
+function updatePageMini(total){const pages=Math.max(1,Math.ceil(total/PAGE_SIZE)); const el=$("#pageMini"); if(el) el.textContent=`${page+1} of ${pages} halaman`;}
+function showTable(show){ $("#grid").style.display = show?'table':'none'; $("#empty").style.display = show?'none':'block'; }
+function renderTable(rows){
+  showTable(rows.length>0); if(!rows.length){ $("#tbody").innerHTML=''; updatePageMini(1); return; }
+  const start=page*PAGE_SIZE, slice=rows.slice(start,start+PAGE_SIZE); const tbody=$("#tbody"); tbody.innerHTML="";
+  slice.forEach(r=>{
+    const tr=document.createElement("tr");
+    TABLE_DISPLAY_COLUMNS.forEach((label,idx)=>{
+      const td=document.createElement("td");
+      const v=get(r,label) || get(r, ALIASES[label]||label);
+      if(idx===0) td.classList.add('sticky-col','cell-name','col-name');
+      if(/UPLOAD|CV/i.test(label)){
+        const s=String(v||"");
+        td.innerHTML=s.startsWith("http")?`<a href="${s}" target="_blank" rel="noopener">Link CV</a>`:s;
+      } else td.textContent=v;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  $("#prev").disabled=page<=0; $("#next").disabled=(start+PAGE_SIZE)>=rows.length; updatePageMini(rows.length);
+}
+function recalc(reset=true){const rows=filteredRows(); if(reset) page=0; renderStats(rows); buildColumns(); renderTable(rows); updateCapsuleValues();}
+
+/* ===== Events ===== */
+document.addEventListener("change",(e)=>{ if(e.target.matches("#f-year")){ rebuildMonthDayOptions(); rebuildOtherFiltersFromDate(); recalc(); }});
+$("#prev").addEventListener('click',()=>{const f=filteredRows(); if(page>0){page--; renderTable(f);}});
+$("#next").addEventListener('click',()=>{const f=filteredRows(); if((page+1)*PAGE_SIZE<f.length){page++; renderTable(f);}});
+document.addEventListener('click',(e)=>{const btn=e.target.closest('.cap-reset'); if(!btn) return; const forId=btn.getAttribute('data-for'); if(forId?.startsWith('multi-')){const key=forId.replace('multi-',''); if(MULTI[key]){MULTI[key].clear(); if(key==='month') rebuildMonthDayOptions(); rebuildOtherFiltersFromDate(); recalc();}} else {const sel=document.getElementById(forId); if(!sel) return; sel.value=''; rebuildMonthDayOptions(); rebuildOtherFiltersFromDate(); recalc();}});
+document.getElementById('filters').addEventListener('click',(e)=>{const cap=e.target.closest('.capsule[data-multi="true"]'); if(!cap) return; const key=cap.getAttribute('data-key'); if(!key) return; openMultiPanel(key,cap);});
+const sidebarEl=$("#filterSidebar"); const toggleBtn=$("#filterToggle");
+if(toggleBtn&&sidebarEl){ toggleBtn.addEventListener('click',()=>{ const open=sidebarEl.classList.toggle('open'); toggleBtn.setAttribute('aria-expanded', open?'true':'false'); }); }
+const isMobileView=()=>window.matchMedia('(max-width: 640px)').matches;
+document.addEventListener('change',(e)=>{ if(isMobileView()&&e.target.closest('#filters')){ setTimeout(()=>{ sidebarEl.classList.remove('open'); if(toggleBtn) toggleBtn.setAttribute('aria-expanded','false'); },80);} });
+
+/* ===== Fetch & parse ===== */
+async function parseCsvToRows(csvText){
+  const parsed = Papa.parse(csvText.replace(/^\uFEFF/,''), { header: true, skipEmptyLines: 'greedy' });
+  const headers = (parsed.meta.fields||[]).map(h=>String(h||'').replace(/[\u200B-\u200D\uFEFF]/g,''));
+  const rows    = (parsed.data||[]).map(r=>{const o={}; headers.forEach(h=> o[h]=r[h]); return o;});
+  const MAP={}; headers.forEach(h=> MAP[norm(h)]=h);
+  if(!headers.length) throw new Error('Header tidak terbaca (cek akses publik & nama sheet).');
+  return { headers, rows, MAP };
+}
+async function loadDataset(dsKey){
+  const cfg=DS[dsKey];
+  let lastErr=null;
+  for(const name of cfg.sheets){
+    try{
+      const url = gvizCsv(cfg.id, name);
+      const text = await tryFetchCsv(url);
+      const parsed = await parseCsvToRows(text);
+      if(!parsed.rows.length) { lastErr = new Error('CSV kosong'); continue; }
+      return { fields: parsed.headers, NAME_MAP: parsed.MAP, rows: parsed.rows, via:`gviz:${name}` };
+    }catch(e){ lastErr = e; }
+  }
+  throw new Error(`Gagal muat: ${cfg.label} — ${lastErr ? lastErr.message : 'unknown'}`);
+}
+function applyData(result){
+  HEADERS=result.fields; NAME_MAP=result.NAME_MAP; ROWS=result.rows;
+  page=0; for(const k of Object.keys(MULTI)) MULTI[k].clear(); $("#f-year").value='';
+  buildColMap(); buildYearOptions(); rebuildMonthDayOptions(); rebuildOtherFiltersFromDate(); updateCapsuleValues(); recalc();
+}
+function setActiveDsButton(key){ document.querySelectorAll('.ds-btn').forEach(b=>{ const active=b.getAttribute('data-ds')===key; b.classList.toggle('active',active); b.setAttribute('aria-selected', active?'true':'false'); }); }
+
+/* ===== Boot & Switch ===== */
+async function boot(initial='nasional'){
+  try{
+    setActiveDsButton(initial);
+    const result=await loadDataset(initial);
+    if(!result.rows.length){ showLoaderError("Tidak ada data pada sheet/CSV."); hideLoader(); DATA_LOADED=true; return; }
+    applyData(result); hideLoader(); DATA_LOADED=true;
+  } catch(err){
+    console.error(err);
+    showLoaderError(`Gagal memuat data: ${String(err.message||err)}`);
+  }
+}
+// NOTE: boot() sekarang dipanggil SETELAH LOGIN, bukan otomatis di sini.
+// boot(CURRENT_DS);
+
+document.querySelectorAll('.ds-btn').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const key=btn.getAttribute('data-ds'); if(key===CURRENT_DS) return; CURRENT_DS=key;
+    showLoader(); $("#loader-sub").textContent=`Mengambil data ${DS[key].label}…`;
+    try{ setActiveDsButton(key); const res=await loadDataset(key); applyData(res); }
+    catch(e){ console.error(e); showLoaderError(`Gagal memuat data ${DS[key].label}: ${String(e.message||e)}`); }
+    finally{ hideLoader(); }
+  });
+});
+
+/* ===== Download ===== */
+document.getElementById('download').addEventListener('click',()=>{
+  const rows=filteredRows();
+  const data=rows.map(r=>{const o={}; EXPORT_COLUMNS.forEach(col=>{ if(col==="USIA"){const fromSheet=get(r,"USIA"); o[col]=fromSheet||computeAge(get(r,"TANGGAL LAHIR"));} else {o[col]=get(r,col)??"";} }); return o;});
+  const ws=XLSX.utils.json_to_sheet(data); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Filtered');
+  const pad=n=>String(n).padStart(2,'0'); const t=new Date();
+  XLSX.writeFile(wb, `pipeline_flk_filtered_${CURRENT_DS}_${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}_${pad(t.getHours())}${pad(t.getMinutes())}.xlsx`);
+});
+
+/* ===== Cek Sumber ===== */
+async function probeDataset(key){
+  const cfg = DS[key];
+  const res = { key, label: cfg.label, ok:false, via:'', rows:0, headers:[], err:null };
+  try{ const r = await loadDataset(key); res.ok=true; res.via=r.via; res.rows=r.rows.length; res.headers=r.fields.slice(0,8); }
+  catch(e){ res.err = e.message || String(e); }
+  return res;
+}
+async function showDatasetStatus(){
+  const box = document.getElementById('dsCheck'); if(!box) return; box.style.display='block'; box.innerHTML = 'Mengecek sumber…';
+  const keys = Object.keys(DS); const results = []; for(const k of keys){ results.push(await probeDataset(k)); }
+  box.innerHTML = results.map(r=> r.ok ?
+    `<div style="margin:6px 0;padding:6px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0"><b>${r.label}</b> ✅ via <b>${r.via}</b> — rows: <b>${r.rows.toLocaleString('id-ID')}</b><br>headers contoh: <code>${r.headers.join(' | ')}</code></div>` :
+    `<div style="margin:6px 0;padding:6px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca"><b>${r.label}</b> ❌ <span style="color:#991b1b">${r.err}</span></div>`
+  ).join('');
+  if(HEADERS.length){
+    buildColMap();
+    box.innerHTML += `<div style="margin-top:8px;padding:6px;border-radius:8px;background:#eef2ff;border:1px solid #c7d2fe">
+      <b>Map kolom aktif:</b><br>${TABLE_DISPLAY_COLUMNS.map(lbl=>`<code>${lbl}</code> ➜ <code>${COL_MAP[lbl]||'-'}</code>`).join("<br>")}
+    </div>`;
+  }
+}
+document.getElementById('btnCheck').addEventListener('click', showDatasetStatus);
+
+/* ===== INIT AUTH FLOW ===== */
+(function init(){
+  const sess = localStorage.getItem('pipeline_user');
+  if(sess){
+    onLogin(true); // sudah login, langsung load data
+  }else{
+    showAuth();    // tampilkan layar login
+  }
+})();
+</script>
+</body>
+</html>
