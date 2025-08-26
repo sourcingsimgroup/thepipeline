@@ -172,7 +172,6 @@ tbody td.sticky-col{z-index:25;background:#fff;box-shadow:4px 0 0 0 #fff,6px 0 8
       <p class="subtitle">create &amp; develop by sourcing department</p>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button id="btnCheck" class="btn" title="Cek status sumber">Cek Sumber</button>
       <!-- USER BOX + LOGOUT (muncul setelah login) -->
       <div id="userBox" class="userbox">
         <span class="uname">👋 <b id="usernameLabel"></b></span>
@@ -275,7 +274,7 @@ tbody td.sticky-col{z-index:25;background:#fff;box-shadow:4px 0 0 0 #fff,6px 0 8
       <section class="section">
         <div class="section-head">Tabel Data Pelamar</div>
         <div class="table-wrap" id="tableWrap">
-          <div id="empty" class="table-empty" style="display:none">Tidak ada data untuk ditampilkan. <b>Cek:</b> status berbagi spreadsheet (set <code>Anyone with the link - Viewer</code>), nama sheet <code>Responses</code>, dan tombol <b>Cek Sumber</b> di atas.</div>
+          <div id="empty" class="table-empty" style="display:none">Tidak ada data untuk ditampilkan. <b>Cek:</b> status berbagi spreadsheet (set <code>Anyone with the link - Viewer</code>) dan nama sheet <code>Responses</code>.</div>
           <table id="grid" style="display:none">
             <thead><tr id="thead-row"></tr></thead>
             <tbody id="tbody"></tbody>
@@ -293,9 +292,9 @@ tbody td.sticky-col{z-index:25;background:#fff;box-shadow:4px 0 0 0 #fff,6px 0 8
 /* ========= AUTH ========= */
 const USERS = [
   { u: 'sourcingho', p: 'sourcingho', name: 'Sourcing HO' },
-  { u: 'rizkia', p: '12345678', name: 'Rizkia Ratu' },
-  { u: 'maulana', p: '12345678', name: 'Maulana' },
-  { u: 'anindya', p: '12345678', name: 'Anindya' },
+  { u: 'rizkia', p: 'regional2', name: 'Rizkia' },
+  { u: 'maulana', p: 'regional3', name: 'Maulana' },
+  { u: 'anindya', p: 'regional1', name: 'Anindya' },
   // Tambahkan user lain di sini: { u:'username', p:'password', name:'Nama tampilan' },
 ];
 
@@ -759,30 +758,6 @@ document.getElementById('download').addEventListener('click',()=>{
   const pad=n=>String(n).padStart(2,'0'); const t=new Date();
   XLSX.writeFile(wb, `pipeline_flk_filtered_${CURRENT_DS}_${t.getFullYear()}${pad(t.getMonth()+1)}${pad(t.getDate())}_${pad(t.getHours())}${pad(t.getMinutes())}.xlsx`);
 });
-
-/* ===== Cek Sumber ===== */
-async function probeDataset(key){
-  const cfg = DS[key];
-  const res = { key, label: cfg.label, ok:false, via:'', rows:0, headers:[], err:null };
-  try{ const r = await loadDataset(key); res.ok=true; res.via=r.via; res.rows=r.rows.length; res.headers=r.fields.slice(0,8); }
-  catch(e){ res.err = e.message || String(e); }
-  return res;
-}
-async function showDatasetStatus(){
-  const box = document.getElementById('dsCheck'); if(!box) return; box.style.display='block'; box.innerHTML = 'Mengecek sumber…';
-  const keys = Object.keys(DS); const results = []; for(const k of keys){ results.push(await probeDataset(k)); }
-  box.innerHTML = results.map(r=> r.ok ?
-    `<div style="margin:6px 0;padding:6px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0"><b>${r.label}</b> ✅ via <b>${r.via}</b> — rows: <b>${r.rows.toLocaleString('id-ID')}</b><br>headers contoh: <code>${r.headers.join(' | ')}</code></div>` :
-    `<div style="margin:6px 0;padding:6px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca"><b>${r.label}</b> ❌ <span style="color:#991b1b">${r.err}</span></div>`
-  ).join('');
-  if(HEADERS.length){
-    buildColMap();
-    box.innerHTML += `<div style="margin-top:8px;padding:6px;border-radius:8px;background:#eef2ff;border:1px solid #c7d2fe">
-      <b>Map kolom aktif:</b><br>${TABLE_DISPLAY_COLUMNS.map(lbl=>`<code>${lbl}</code> ➜ <code>${COL_MAP[lbl]||'-'}</code>`).join("<br>")}
-    </div>`;
-  }
-}
-document.getElementById('btnCheck').addEventListener('click', showDatasetStatus);
 
 /* ===== INIT AUTH FLOW ===== */
 (function init(){
